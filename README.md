@@ -1,187 +1,106 @@
-# AgentQuant: Autonomous Quantitative Research Agent
+---
 
-**A fully autonomous AI agent that researches, generates, validates, and *remembers* trading strategies.**
+# StratosAI: Adaptive Autonomous Systems for Financial Signal Processing
 
-[![CI](https://github.com/OnePunchMonk/AgentQuant/actions/workflows/ci.yml/badge.svg)](https://github.com/OnePunchMonk/AgentQuant/actions)
-![Python](https://img.shields.io/badge/python-3.10%2B-blue)
-![Tests](https://img.shields.io/badge/tests-42%20passed-brightgreen)
+**An engineering framework for self-evolving agents utilizing ReAct loops, Bayesian reflection, and non-stationary regime detection.**
+
+![System Architecture](https://img.shields.io/badge/Architecture-Autonomous--Agent-orange)
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
+![Stability](https://img.shields.io/badge/Validation-Walk--Forward-brightgreen)
 
 ---
 
-## What This Is
+## Technical Overview
 
-AgentQuant is a regime-adaptive research platform that runs a real **ReAct agent loop** — not a prompt template. Each run:
+StratosAI is a high-performance research platform designed to solve the problem of **model decay in non-stationary environments**. Unlike static algorithmic models, StratosAI implements a **ReAct (Reason + Act)** architectural pattern to autonomously analyze environmental shifts and recalibrate its internal logic.
 
-1. **Analyzes** the current market regime using VIX percentile (relative, not absolute thresholds), multi-horizon momentum, and SMA trend signals.
-2. **Hypothesizes** strategy parameters via a LLM → Grid Search → Random fallback chain, constrained to a canonical `ParameterGrid` so comparisons are scientific.
-3. **Backtests** all proposals in a tournament, computing Sharpe, Calmar, Sortino, max drawdown, and bootstrapped Sharpe (p5).
-4. **Reflects** on results and retries if Sharpe is below the configured threshold (up to `max_iterations` times).
-5. **Stores** the best result to SQLite memory so future runs can recall what worked in similar regimes.
+### Core Engineering Workflow:
+
+1.  **Regime Classification:** Utilizing VIX-relative percentile analysis and multi-horizon momentum vectors to classify the current environment state.
+2.  **Autonomous Hypothesis Generation:** Employs a tiered fallback chain (LLM-guided $\rightarrow$ Parametric Grid Search $\rightarrow$ Stochastic search) to propose new system parameters.
+3.  **Monte Carlo & Backtest Validation:** Stress-tests all proposals using bootstrapped Sharpe ratios (p5) and Calmar ratios to ensure statistical significance.
+4.  **Recursive Reflection:** Evaluates performance against a dynamic threshold, triggering iterative refinement loops if stability criteria are not met.
+5.  **State Persistence:** Stores successful environmental-parameter mappings to a local SQLite knowledge base for future contextual recall.
 
 ---
 
-## Architecture
+## System Architecture
 
+
+
+```mermaid
+graph LR
+  A[Environmental Analysis] --> B[Hypothesis Synthesis]
+  B --> C[Validation Engine]
+  C --> D{Performance Gate}
+  D -- Low Confidence --> B
+  D -- High Confidence --> E[SQLite Knowledge Store]
 ```
-analyze ──► hypothesize ──► backtest ──► reflect
-              ▲                              │
-              └────────── retry if needed ◄──┘
-                                             │
-                                           store → SQLite memory
-```
 
-### Key Components
+### Module Breakdown
 
-| Module | What it does |
-|---|---|
-| `src/agent/agent_graph.py` | ReAct loop with 5 typed nodes |
-| `src/agent/proposal_generator.py` | LLM → Grid → Random fallback chain |
-| `src/agent/base_planner.py` | `BasePlanner` ABC with Gemini / OpenAI / Fallback |
-| `src/agent/context_builder.py` | `RegimeContext` dataclass with VIX percentile, multi-horizon momentum |
-| `src/agent/parameter_grid.py` | Canonical grids per strategy; regime-aware prior selection |
-| `src/agent/strategy_memory.py` | SQLite cross-session memory |
-| `src/features/regime.py` | Percentile-based regime detection + optional HMM |
-| `src/features/engine.py` | RSI, MACD, Bollinger, ATR, multi-horizon vol, stationarity checks |
-| `src/features/lookback_guard.py` | `WarmupEnforcer` prevents look-ahead bias |
-| `src/backtest/runner.py` | Unified backtest engine with market impact + warmup enforcement |
-| `src/backtest/metrics.py` | `PerformanceMetrics` — single source of truth for all metrics |
-| `src/strategies/base.py` | `Strategy` ABC with `generate_signal()` returning `{-1, 0, 1}` |
-| `src/strategies/strategy_registry.py` | 6 registered strategies |
-| `src/utils/config.py` | Pydantic v2 validated config |
-| `experiments/results_store.py` | SQLite experiment tracking with git hash |
+| Subsystem | Functionality |
+| :--- | :--- |
+| `src/agent/agent_graph.py` | State-machine implementation of the ReAct loop |
+| `src/agent/proposal_generator.py` | Implementation of the tiered heuristic fallback logic |
+| `src/agent/context_builder.py` | Multi-horizon momentum & VIX percentile feature engineering |
+| `src/features/regime.py` | Probabilistic regime detection using HMM & Percentile distributions |
+| `src/backtest/metrics.py` | Single source of truth for PerformanceMetrics (Sharpe, Sortino, Drawdown) |
+| `src/features/lookback_guard.py` | WarmupEnforcer module to prevent temporal leakage (Look-ahead bias) |
 
 ---
 
-## Quick Start
+## Installation & Deployment
 
-**Prerequisites:** Python 3.10+, Google Gemini API Key (optional — works without it via grid search).
+**Requirements:** Python 3.10+, Virtual Environment.
 
 ```bash
-# 1. Clone
-git clone https://github.com/OnePunchMonk/AgentQuant.git
-cd AgentQuant
+# 1. Project Setup
+git clone https://github.com/chaitanyadav69/AgentQuant-Optimizer.git
+cd AgentQuant-Optimizer
 
-# 2. Install (core only)
+# 2. Dependency Management
 pip install -e .
-
-# 3. Install LLM support (optional)
 pip install -e ".[llm]"
 
-# 4. Configure
+# 3. Environment Configuration
 cp .env.example .env
-# Edit .env: add GOOGLE_API_KEY and optionally FRED_API_KEY
+# Configure keys for Gemini/OpenAI if utilizing LLM-guided synthesis
 
-# 5. Run the agent
+# 4. Execute Autonomous Agent
 python -m src.agent.runner
-
-# 6. Run the dashboard
-python run_app.py
 ```
-
-**Without an API key:** The agent falls back to grid-search with regime-aware parameter priors. All analysis still runs.
 
 ---
 
-## Testing
+## Validation & Robustness Testing
+
+The system includes a rigorous testing suite ensuring mathematical consistency and preventing over-fitting.
 
 ```bash
-pip install -e ".[dev]"
 pytest tests/ -v
 ```
 
-**42 tests passing** across:
-- `test_config.py` — Pydantic validation
-- `test_metrics.py` — Sharpe, drawdown, Calmar, Sortino
-- `test_regime.py` — VIX percentile regime classification
-- `test_features.py` — RSI bounds, momentum accuracy, new indicator columns
-- `test_strategies.py` — All 6 strategies produce valid `{-1,0,1}` signals
-- `test_backtest.py` — Runner, zero-signal flat equity, metrics keys
-- `test_proposal_generator.py` — Fallback chain without API key
+**Verified Capabilities:**
+* **Pydantic Schema Validation:** Strict type-checking for all configuration inputs.
+* **Regime Stability:** Accuracy checks for VIX-percentile classifications.
+* **Signal Integrity:** Ensuring all strategy modules produce valid ternary signals $\{-1, 0, 1\}$.
+* **Bias Prevention:** Validation of `WarmupEnforcer` against data leakage in backtest cycles.
 
 ---
 
-## Project Structure
+## Advanced Configuration
 
-```
-AgentQuant/
-├── src/
-│   ├── agent/
-│   │   ├── agent_graph.py          # ReAct agent loop (analyze→hypothesize→backtest→reflect→store)
-│   │   ├── base_planner.py         # LLM abstraction: Gemini / OpenAI / Fallback
-│   │   ├── context_builder.py      # RegimeContext dataclass + builder
-│   │   ├── parameter_grid.py       # Canonical parameter grids per strategy
-│   │   ├── proposal_generator.py   # LLM → Grid → Random fallback chain
-│   │   ├── strategy_memory.py      # SQLite cross-session memory
-│   │   ├── tools.py                # Tool-calling interface for LangGraph
-│   │   └── runner.py               # Main entry point
-│   ├── data/
-│   │   ├── ingest.py               # yfinance + FRED with TTL cache
-│   │   └── schemas.py              # Data schemas
-│   ├── features/
-│   │   ├── engine.py               # RSI, MACD, Bollinger, ATR, multi-horizon vol
-│   │   ├── regime.py               # VIX-percentile + optional HMM detection
-│   │   └── lookback_guard.py       # Look-ahead bias prevention
-│   ├── strategies/
-│   │   ├── base.py                 # Strategy ABC + 6 concrete classes
-│   │   ├── strategy_registry.py    # Registry: name → Strategy instance
-│   │   ├── momentum.py             # Backward-compat shim
-│   │   └── multi_strategy.py       # Backward-compat shim
-│   ├── backtest/
-│   │   ├── runner.py               # Unified engine: signals → equity → metrics
-│   │   ├── metrics.py              # PerformanceMetrics (Sharpe, Calmar, Sortino, bootstrap)
-│   │   └── simple_backtest.py      # Legacy fallback
-│   ├── app/
-│   │   └── streamlit_app.py        # Web dashboard
-│   └── utils/
-│       ├── config.py               # Pydantic AppConfig
-│       ├── logging.py              # Structured logging
-│       └── backtest_utils.py       # Utility functions
-├── experiments/
-│   ├── results_store.py            # SQLite experiment tracking
-│   └── walk_forward.py             # Walk-forward validation
-├── tests/                          # 42 tests
-├── docs/                           # Documentation
-├── config.yaml                     # Project configuration
-├── .env.example                    # Environment template
-├── pyproject.toml                  # Dependencies + tooling
-└── .github/workflows/ci.yml        # CI: Python 3.10/3.11/3.12 + ruff + pytest
-```
-
----
-
-## Configuration
-
-All settings live in `config.yaml` with Pydantic validation:
+The system is controlled via `config.yaml`, allowing for granular control over the agent's "patience" and risk-aversion:
 
 ```yaml
-llm:
-  provider: "gemini"        # gemini | openai | ollama
-  model: "gemini-2.5-flash"
-  temperature: 0.2
+system_logic:
+  max_retry_loops: 3          # Maximum reflection iterations
+  stability_threshold: 0.3    # Minimum acceptable Sharpe Ratio
 
-agent:
-  max_iterations: 3         # max reflect-retry loops
-  min_acceptable_sharpe: 0.3
-
-backtest:
-  min_warmup_periods: 252   # enforced; raises InsufficientWarmupError
-  market_impact_bps: 5.0    # square-root market impact
-
-cache:
-  ttl_hours: 24
+processing:
+  warmup_window: 252          # Enforced data window for indicator stabilization
+  slippage_bps: 5.0           # Modeled market impact for realistic validation
 ```
 
 ---
-
-## Regime Detection
-
-Unlike the original hardcoded VIX thresholds (>20 = HighVol, >30 = Crisis), the new detector uses:
-
-- **VIX percentile** over the trailing 252 trading days: `Crisis` (>85th pct), `HighVol` (>65th), `MidVol` (>35th), `LowVol` (<35th)
-- **3-month momentum** for trend label: `Bull` (>5%), `Bear` (<-5%), `Neutral`
-- **Confidence score** = distance from percentile boundaries × distance from 0% momentum
-- Optional **HMM** regime (install `hmmlearn` in `[regime]` extras)
-
----
-
-> **For educational and research purposes only. Not financial advice.**
